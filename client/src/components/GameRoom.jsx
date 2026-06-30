@@ -66,17 +66,9 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       setOpponentLeftLobby(true);
     });
 
-    socket.on('game-state-sync', ({ players: p, gameState: gs }) => {
-      setPlayers(p);
-      setGameState(gs);
-    });
-
     socket.on('error-msg', ({ message }) => {
       alert(message);
     });
-
-    // Request initial state synchronization
-    socket.emit('request-game-state', { roomId });
 
     return () => {
       socket.off('game-start');
@@ -86,7 +78,6 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       socket.off('rematch-requested');
       socket.off('opponent-disconnected');
       socket.off('opponent-left-lobby');
-      socket.off('game-state-sync');
       socket.off('error-msg');
     };
   }, []);
@@ -137,6 +128,57 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       setSelectedSquare(null);
       setValidMoves([]);
     }
+  };
+
+  const handleDragStart = (e, r, c) => {
+    if (!gameState || gameState.status !== 'active' || opponentDisconnected) return;
+    const isOurTurn = gameState.turn === playerColor;
+    if (!isOurTurn) {
+      e.preventDefault();
+      return;
+    }
+
+    const piece = gameState.board[r][c];
+    if (!piece || piece.color !== playerColor || piece.frozenTurns > 0) {
+      e.preventDefault();
+      return;
+    }
+
+    setSelectedSquare({ r, c });
+    const moves = getLegalMoves(gameState, r, c);
+    setValidMoves(moves);
+
+    e.dataTransfer.setData('text/plain', JSON.stringify({ r, c }));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, r, c) => {
+    const isMoveValid = validMoves.some((m) => m.r === r && m.c === c);
+    if (isMoveValid) {
+      e.preventDefault();
+    }
+  };
+
+  const handleDrop = (e, r, c) => {
+    e.preventDefault();
+    try {
+      const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+      const isMoveValid = validMoves.some((m) => m.r === r && m.c === c);
+      
+      if (dragData && isMoveValid) {
+        socket.emit('make-move', { roomId, from: dragData, to: { r, c } });
+      }
+    } catch (err) {
+      console.error('Drop error:', err);
+    }
+    
+    setSelectedSquare(null);
+    setValidMoves([]);
+  };
+
+  const handleDragEnd = () => {
+    setSelectedSquare(null);
+    setValidMoves([]);
   };
 
   const handleCastSelfSpell = (spellId) => {
@@ -221,8 +263,8 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
 
         <div style={{ textAlign: 'center' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ROOM CODE: </span>
-          <span style={{ fontWeight: 'bold', color: 'var(--primary-neon)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={copyRoomCode}>
-            {roomId} {copied ? <Check size={14} style={{ stroke: '#00e676' }} /> : <Copy size={14} />}
+          <span style={{ fontWeight: 'bold', color: 'var(--primary-neon)' }}>
+            {roomId}
           </span>
         </div>
 
@@ -274,14 +316,31 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
                   <div
                     key={`${r}-${c}`}
                     onClick={() => handleSquareClick(r, c)}
+                    onDragOver={(e) => handleDragOver(e, r, c)}
+                    onDrop={(e) => handleDrop(e, r, c)}
                     className={`square ${squareClass} ${isSelected ? 'selected' : ''} ${isHighlighted && !isCapture ? 'highlighted' : ''} ${isCapture ? 'capture-highlighted' : ''} ${isLastMove ? 'last-move' : ''} ${piece && piece.frozenTurns > 0 ? 'frozen' : ''}`}
                   >
                     {piece && (
-                      <PieceSVG
-                        type={piece.type}
-                        color={piece.color}
-                        className={`chess-piece ${piece.color === 'w' ? 'white-piece' : 'black-piece'}`}
-                      />
+                      <div
+                        draggable={isMyTurn && piece.color === playerColor && piece.frozenTurns === 0 && spellCastActive !== 'freeze'}
+                        onDragStart={(e) => handleDragStart(e, r, c)}
+                        onDragEnd={handleDragEnd}
+                        style={{
+                          width: '80%',
+                          height: '80%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: (isMyTurn && piece.color === playerColor && piece.frozenTurns === 0) ? 'grab' : 'default'
+                        }}
+                      >
+                        <PieceSVG
+                          type={piece.type}
+                          color={piece.color}
+                          className={`chess-piece ${piece.color === 'w' ? 'white-piece' : 'black-piece'}`}
+                          style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
+                        />
+                      </div>
                     )}
                   </div>
                 );
@@ -312,7 +371,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
               <button
                 className={`spell-button ${spellCastActive === 'freeze' ? 'active' : ''}`}
                 onClick={handleCastFreezeInitiate}
-                disabled={!isMyTurn || gameState.spells[playerColor].freeze === 0 || gameState.status !== 'active' || opponentDisconnected}
+                disabled={!isMyTurn || gameState.spells[playerColor].freeze === 0 || gameState.status !== 'active' || opponentDisconnected || gameState.spellCastThisTurn}
               >
                 <span className="spell-icon">❄️</span>
                 <div className="spell-details">
@@ -328,7 +387,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
               <button
                 className="spell-button"
                 onClick={() => handleCastSelfSpell('double_move')}
-                disabled={!isMyTurn || gameState.spells[playerColor].double_move === 0 || gameState.status !== 'active' || opponentDisconnected || doubleMoveActive}
+                disabled={!isMyTurn || gameState.spells[playerColor].double_move === 0 || gameState.status !== 'active' || opponentDisconnected || doubleMoveActive || gameState.spellCastThisTurn}
               >
                 <span className="spell-icon">⚡</span>
                 <div className="spell-details">
@@ -344,7 +403,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
               <button
                 className="spell-button"
                 onClick={() => handleCastSelfSpell('move_changer')}
-                disabled={!isMyTurn || gameState.spells[playerColor].move_changer === 0 || gameState.status !== 'active' || opponentDisconnected || moveChangerActive}
+                disabled={!isMyTurn || gameState.spells[playerColor].move_changer === 0 || gameState.status !== 'active' || opponentDisconnected || moveChangerActive || gameState.spellCastThisTurn}
               >
                 <span className="spell-icon">✨</span>
                 <div className="spell-details">

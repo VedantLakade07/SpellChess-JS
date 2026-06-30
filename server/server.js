@@ -186,21 +186,8 @@ io.on('connection', (socket) => {
         },
         gameState: room.gameState
       });
+      console.log(`Room ${roomId} fully occupied. Game starting.`);
     }
-  });
-
-  // Event: Request game state (for synchronization)
-  socket.on('request-game-state', ({ roomId }) => {
-    const room = rooms.get(roomId);
-    if (!room) return;
-
-    socket.emit('game-state-sync', {
-      players: {
-        w: room.players.w ? { username: room.players.w.username, id: room.players.w.userId } : null,
-        b: room.players.b ? { username: room.players.b.username, id: room.players.b.userId } : null
-      },
-      gameState: room.players.w && room.players.b ? room.gameState : null
-    });
   });
 
   // Event: Make a move

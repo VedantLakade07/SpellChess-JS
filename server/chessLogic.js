@@ -36,6 +36,7 @@ const createInitialGameState = () => ({
     b: { doubleMove: false, moveChanger: false }
   },
   doubleMoveStep: 0, // 0 = normal, 1 = completed 1st move of double move, waiting for 2nd
+  spellCastThisTurn: false,
   lastMove: null, // { from: {r, c}, to: {r, c}, piece }
   winner: null,
   status: 'active', // 'active', 'checkmate', 'draw', 'stalemate'
@@ -63,6 +64,7 @@ const cloneGameState = (state) => {
       b: { ...state.activeSpells.b }
     },
     doubleMoveStep: state.doubleMoveStep,
+    spellCastThisTurn: state.spellCastThisTurn,
     lastMove: state.lastMove ? { ...state.lastMove } : null,
     winner: state.winner,
     status: state.status
@@ -428,6 +430,7 @@ const makeMove = (state, from, to) => {
     }
 
     state.turn = nextTurn;
+    state.spellCastThisTurn = false; // Reset spell cast flag for the new player's turn
   }
 
   // Check game over statuses (Checkmate / Stalemate)
@@ -451,6 +454,11 @@ const makeMove = (state, from, to) => {
 const castSpell = (state, spellId, targetPos = null) => {
   const player = state.turn;
 
+  // Check if player has already cast a spell this turn
+  if (state.spellCastThisTurn) {
+    return { success: false, error: 'You can only cast one spell per turn.' };
+  }
+
   // Verify player has a charge for this spell
   if (!state.spells[player][spellId] || state.spells[player][spellId] <= 0) {
     return { success: false, error: 'No charges remaining for this spell' };
@@ -471,6 +479,7 @@ const castSpell = (state, spellId, targetPos = null) => {
       // Apply freeze
       piece.frozenTurns = 2;
       state.spells[player].freeze = 0; // Consume charge
+      state.spellCastThisTurn = true;
       return { success: true };
     }
 
@@ -479,6 +488,7 @@ const castSpell = (state, spellId, targetPos = null) => {
       state.activeSpells[player].doubleMove = true;
       state.doubleMoveStep = 0;
       state.spells[player].double_move = 0; // Consume charge
+      state.spellCastThisTurn = true;
       return { success: true };
     }
 
@@ -486,6 +496,7 @@ const castSpell = (state, spellId, targetPos = null) => {
       // Activate move changer flag
       state.activeSpells[player].moveChanger = true;
       state.spells[player].move_changer = 0; // Consume charge
+      state.spellCastThisTurn = true;
       return { success: true };
     }
 
