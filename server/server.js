@@ -61,12 +61,13 @@ const handleUserDisconnect = (socket) => {
       const opponent = room.players[opponentColor];
 
       if (opponent) {
-        io.to(opponent.socketId).emit('opponent-disconnected', {
-          message: 'Your opponent disconnected. You win by default or can leave.'
-        });
+        const isGameActive = room.gameState && room.gameState.status === 'active';
 
-        // Record default win if match was active and not completed
-        if (room.gameState && room.gameState.status === 'active') {
+        if (isGameActive) {
+          io.to(opponent.socketId).emit('opponent-disconnected', {
+            message: 'Your opponent disconnected. You win by default or can leave.'
+          });
+
           room.gameState.status = 'aborted';
           room.gameState.winner = opponentColor;
           
@@ -74,6 +75,10 @@ const handleUserDisconnect = (socket) => {
           saveMatchToDb(roomId, room, opponent.userId).catch(err => 
             console.error('Error saving aborted match to DB:', err)
           );
+        } else {
+          io.to(opponent.socketId).emit('opponent-left-lobby', {
+            message: 'Your opponent has left the lobby.'
+          });
         }
       }
 

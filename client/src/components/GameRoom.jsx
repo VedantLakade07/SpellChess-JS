@@ -16,6 +16,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   const [copied, setCopied] = useState(false);
   const [spellAlert, setSpellAlert] = useState(null); // { message, color }
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+  const [opponentLeftLobby, setOpponentLeftLobby] = useState(false);
 
   const chatEndRef = useRef(null);
 
@@ -31,6 +32,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       setGameState(gs);
       setRematchRequested({ w: false, b: false });
       setOpponentDisconnected(false);
+      setOpponentLeftLobby(false);
     });
 
     socket.on('state-updated', (gs) => {
@@ -60,6 +62,10 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       setOpponentDisconnected(true);
     });
 
+    socket.on('opponent-left-lobby', () => {
+      setOpponentLeftLobby(true);
+    });
+
     socket.on('error-msg', ({ message }) => {
       alert(message);
     });
@@ -71,6 +77,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       socket.off('chat-message');
       socket.off('rematch-requested');
       socket.off('opponent-disconnected');
+      socket.off('opponent-left-lobby');
       socket.off('error-msg');
     };
   }, []);
@@ -377,18 +384,20 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       </div>
 
       {/* Game Over / Opponent Disconnected Modal Dialog */}
-      {(gameState.status !== 'active' || opponentDisconnected) && (
+      {(gameState.status !== 'active' || opponentDisconnected || opponentLeftLobby) && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
           <div className="glass-panel" style={{ padding: '3rem', maxWidth: '450px', width: '90%', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '2px solid var(--primary-neon)' }}>
             <h2 className="title-gradient" style={{ fontSize: '2rem' }}>
-              {opponentDisconnected ? 'Match Aborted' : 'Match Concluded'}
+              {opponentLeftLobby ? 'Opponent Left' : (opponentDisconnected ? 'Match Aborted' : 'Match Concluded')}
             </h2>
 
             <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
-              {opponentDisconnected ? (
+              {opponentLeftLobby ? (
+                'Your opponent has left the room lobby.'
+              ) : opponentDisconnected ? (
                 'Your opponent disconnected from the match.'
               ) : gameState.status === 'checkmate' ? (
                 gameState.winner === playerColor ? '🎉 Checkmate! You are victorious! 🎉' : '💀 Checkmate! You have been defeated. 💀'
@@ -398,7 +407,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
             </p>
 
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', width: '100%', marginTop: '1rem' }}>
-              {!opponentDisconnected && (
+              {!opponentDisconnected && !opponentLeftLobby && (
                 <button
                   className="btn-primary"
                   onClick={handleRematchRequest}
@@ -414,7 +423,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
               </button>
             </div>
             
-            {!opponentDisconnected && rematchRequested[playerColor === 'w' ? 'b' : 'w'] && (
+            {!opponentDisconnected && !opponentLeftLobby && rematchRequested[playerColor === 'w' ? 'b' : 'w'] && (
               <p style={{ fontSize: '0.85rem', color: 'var(--primary-neon)' }}>Opponent has requested a rematch!</p>
             )}
           </div>
