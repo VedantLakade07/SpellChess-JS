@@ -1,0 +1,486 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg-dark: #0b0c10;
+  --bg-card: rgba(31, 40, 51, 0.45);
+  --primary-neon: #66fcf1;
+  --secondary-neon: #45a29e;
+  --glow-light: rgba(102, 252, 241, 0.3);
+  --accent-pink: #ff007f;
+  --text-white: #ffffff;
+  --text-muted: #c5c6c7;
+  --ice-blue: #a3e5fc;
+  --ice-glow: rgba(163, 229, 252, 0.4);
+  --double-gold: #ffd700;
+  --double-glow: rgba(255, 215, 0, 0.4);
+  --changer-purple: #9b5de5;
+  --changer-glow: rgba(155, 93, 229, 0.4);
+
+  --font-title: 'Outfit', 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--secondary-neon) transparent;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-dark);
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(102, 252, 241, 0.08) 0px, transparent 50%),
+    radial-gradient(at 90% 80%, rgba(155, 93, 229, 0.08) 0px, transparent 50%);
+  color: var(--text-white);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-title);
+  letter-spacing: 0.5px;
+}
+
+/* Glassmorphism containers */
+.glass-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel:hover {
+  border-color: rgba(102, 252, 241, 0.2);
+}
+
+/* Interactive elements */
+button {
+  cursor: pointer;
+  outline: none;
+  font-family: var(--font-title);
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary-neon), var(--secondary-neon));
+  color: var(--bg-dark);
+  border: none;
+  padding: 12px 24px;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 15px var(--glow-light);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px var(--primary-neon);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  transform: none;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--primary-neon);
+  border: 1px solid var(--primary-neon);
+  padding: 12px 24px;
+}
+
+.btn-secondary:hover {
+  background: rgba(102, 252, 241, 0.1);
+  box-shadow: 0 0 15px var(--glow-light);
+}
+
+.input-field {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: white;
+  padding: 12px 16px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.input-field:focus {
+  border-color: var(--primary-neon);
+  box-shadow: 0 0 8px var(--glow-light);
+  outline: none;
+}
+
+/* Layouts */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.auth-card {
+  max-width: 450px;
+  margin: auto;
+  padding: 2.5rem;
+  width: 100%;
+}
+
+.title-gradient {
+  background: linear-gradient(to right, #ffffff, var(--primary-neon));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+/* Chessboard Styling */
+.chessboard-container {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 100%;
+  max-width: 560px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 4px solid var(--secondary-neon);
+  box-shadow: 0 15px 50px rgba(0,0,0,0.6);
+  position: relative;
+}
+
+.square {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.square.light {
+  background-color: #1f2833;
+}
+
+.square.dark {
+  background-color: #0b0c10;
+}
+
+.square.highlighted::before {
+  content: '';
+  width: 25%;
+  height: 25%;
+  border-radius: 50%;
+  background-color: rgba(102, 252, 241, 0.8);
+  position: absolute;
+  box-shadow: 0 0 10px var(--primary-neon);
+  z-index: 2;
+}
+
+.square.capture-highlighted::before {
+  content: '';
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 0, 127, 0.7);
+  position: absolute;
+  box-shadow: 0 0 10px var(--accent-pink);
+  z-index: 2;
+}
+
+.square.selected {
+  background-color: rgba(102, 252, 241, 0.25) !important;
+  box-shadow: inset 0 0 12px var(--primary-neon);
+}
+
+.square.last-move {
+  background-color: rgba(69, 162, 158, 0.2) !important;
+}
+
+/* Chess Piece Icons */
+.chess-piece {
+  width: 80%;
+  height: 80%;
+  z-index: 3;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.chess-piece:hover {
+  transform: scale(1.15) translateY(-2px);
+}
+
+.chess-piece.white-piece {
+  filter: drop-shadow(0 2px 4px rgba(255, 255, 255, 0.5));
+}
+
+.chess-piece.black-piece {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8)) brightness(0.85);
+}
+
+/* Ice Freeze overlay on piece */
+.square.frozen::after {
+  content: '❄️';
+  position: absolute;
+  font-size: 2.2rem;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  animation: freeze-shiver 2s infinite ease-in-out;
+  pointer-events: none;
+}
+
+.square.frozen {
+  background: radial-gradient(circle, var(--ice-glow) 0%, transparent 80%);
+  box-shadow: inset 0 0 15px var(--ice-blue) !important;
+}
+
+@keyframes freeze-shiver {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+  50% { transform: translate(-50%, -50%) rotate(10deg) scale(1.1); filter: drop-shadow(0 0 8px var(--ice-blue)); }
+}
+
+/* Spell Selector & Casting overlays */
+.spell-panel-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  width: 100%;
+}
+
+.spell-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: rgba(11, 12, 16, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: var(--text-white);
+  font-size: 0.95rem;
+  text-align: left;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.spell-button:hover:not(:disabled) {
+  border-color: var(--primary-neon);
+  background: rgba(102, 252, 241, 0.05);
+  transform: translateX(4px);
+}
+
+.spell-button.active {
+  border-color: var(--accent-pink);
+  background: rgba(255, 0, 127, 0.08);
+  box-shadow: 0 0 15px rgba(255, 0, 127, 0.3);
+}
+
+.spell-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.spell-icon {
+  font-size: 1.5rem;
+}
+
+.spell-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.spell-name {
+  font-weight: 700;
+}
+
+.spell-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.spell-charge {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  font-size: 0.7rem;
+  background: var(--secondary-neon);
+  color: var(--bg-dark);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.spell-charge.depleted {
+  background: #333;
+  color: #888;
+}
+
+/* Active Spells Highlights */
+.double-move-glow {
+  box-shadow: 0 0 25px var(--double-gold);
+  border-color: var(--double-gold) !important;
+  animation: pulse-gold 1.5s infinite alternate;
+}
+
+@keyframes pulse-gold {
+  from { box-shadow: 0 0 10px var(--double-gold); }
+  to { box-shadow: 0 0 25px var(--double-gold), inset 0 0 10px var(--double-gold); }
+}
+
+.move-changer-glow {
+  box-shadow: 0 0 25px var(--changer-purple);
+  border-color: var(--changer-purple) !important;
+  animation: pulse-purple 1.5s infinite alternate;
+}
+
+@keyframes pulse-purple {
+  from { box-shadow: 0 0 10px var(--changer-purple); }
+  to { box-shadow: 0 0 25px var(--changer-purple), inset 0 0 10px var(--changer-purple); }
+}
+
+/* Spell Selection targeting animation */
+.spell-casting-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(102, 252, 241, 0.08);
+  border: 3px dashed var(--primary-neon);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--primary-neon);
+  text-shadow: 0 2px 10px var(--glow-light);
+  pointer-events: none;
+  animation: pulse-overlay 1.5s infinite alternate;
+  z-index: 10;
+}
+
+@keyframes pulse-overlay {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+/* Game Interface */
+.game-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .game-grid {
+    grid-template-columns: auto 1fr;
+  }
+}
+
+.match-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.match-history-table th, .match-history-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.match-history-table th {
+  font-weight: 700;
+  color: var(--primary-neon);
+  font-family: var(--font-title);
+}
+
+.match-history-table tr:hover td {
+  background: rgba(255,255,255,0.02);
+}
+
+/* Chat component */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 350px;
+  width: 100%;
+}
+
+.chat-messages {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-message {
+  font-size: 0.88rem;
+  word-wrap: break-word;
+}
+
+.chat-sender {
+  font-weight: 700;
+  color: var(--secondary-neon);
+  margin-right: 6px;
+}
+
+.chat-input-form {
+  display: flex;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 8px;
+}
+
+.chat-input {
+  flex-grow: 1;
+  background: transparent;
+  border: none;
+  color: white;
+  padding: 8px;
+  outline: none;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-box {
+  padding: 1.2rem;
+  text-align: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--primary-neon);
+  font-family: var(--font-title);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
