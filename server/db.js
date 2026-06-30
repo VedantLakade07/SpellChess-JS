@@ -1,7 +1,10 @@
+require('dotenv').config();
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const dbPath = path.join(__dirname, 'spellchess.db');
+const dbPath = process.env.DB_PATH
+  ? path.resolve(process.env.DB_PATH)
+  : path.join(__dirname, 'spellchess.db');
 const db = new sqlite3.Database(dbPath);
 
 // Helper functions wrapping sqlite3 in promises

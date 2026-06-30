@@ -8,10 +8,8 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Set API URL - dynamically adapt to current location or default to 5000
-  const API_URL = window.location.origin.includes('localhost') 
-    ? 'http://localhost:5000/api/auth'
-    : `${window.location.protocol}//${window.location.hostname}:5000/api/auth`;
+  // Set API URL from env (falls back to localhost for development)
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/auth';
 
   useEffect(() => {
     if (token) {
