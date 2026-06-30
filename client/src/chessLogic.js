@@ -1,4 +1,4 @@
-// Chess logic with custom spell mechanics for Spell Chess Online (ES Module Version)
+// Chess logic with custom spell mechanics for Spell Chess (ES Module Version)
 
 export const createInitialBoard = () => {
   const backRank = ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'];

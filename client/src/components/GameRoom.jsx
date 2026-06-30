@@ -66,9 +66,17 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       setOpponentLeftLobby(true);
     });
 
+    socket.on('game-state-sync', ({ players: p, gameState: gs }) => {
+      setPlayers(p);
+      setGameState(gs);
+    });
+
     socket.on('error-msg', ({ message }) => {
       alert(message);
     });
+
+    // Request initial state synchronization
+    socket.emit('request-game-state', { roomId });
 
     return () => {
       socket.off('game-start');
@@ -78,6 +86,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       socket.off('rematch-requested');
       socket.off('opponent-disconnected');
       socket.off('opponent-left-lobby');
+      socket.off('game-state-sync');
       socket.off('error-msg');
     };
   }, []);

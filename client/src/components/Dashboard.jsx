@@ -72,7 +72,7 @@ const Dashboard = ({ onCreateRoom, onJoinRoom }) => {
         <div>
           <h2 className="title-gradient" style={{ fontSize: '2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Swords style={{ width: '32px', height: '32px', stroke: '#66fcf1' }} />
-            Spell Chess Online
+            Spell Chess
           </h2>
           <p style={{ color: 'var(--text-muted)' }}>Welcome back, {user?.username}!</p>
         </div>
