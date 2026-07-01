@@ -345,6 +345,10 @@ const makeMove = (state, from, to, promotion = 'q') => {
   const matchedMove = legalMoves.find((m) => m.r === to.r && m.c === to.c);
   if (!matchedMove) return false;
 
+  if (state.activeSpells[state.turn]?.moveChanger && (piece.type === 'b' || piece.type === 'q')) {
+    state.activeSpells[state.turn].moveChanger = false;
+  }
+
   // Check for King capture (king is dead)
   const destPiece = state.board[to.r][to.c];
   if (destPiece && destPiece.type === 'k') {

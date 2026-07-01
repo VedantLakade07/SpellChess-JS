@@ -2,7 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { socket } from '../socket';
 import { getLegalMoves } from '../chessLogic';
 import PieceSVG from './ChessPieces';
-import { Copy, Check, MessageSquare, Send, ArrowLeft, RefreshCw, Activity } from 'lucide-react';
+import { Copy, Check, ArrowLeft } from 'lucide-react';
+import BattleLog from './BattleLog';
+import ChatPanel from './ChatPanel';
+import PromotionModal from './PromotionModal';
+import DrawOfferModal from './DrawOfferModal';
+import ConcludedModal from './ConcludedModal';
+import SpellBook from './SpellBook';
 
 const GameRoom = ({ roomId, playerColor, onLeave }) => {
   const [gameState, setGameState] = useState(null);
@@ -546,241 +552,58 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
         {/* Right Side: Spell Controls & Chat */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
           
-          {/* Spells Panel */}
-          <div className="glass-panel" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-            <h3 style={{ color: 'var(--primary-neon)', fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>✨ Spell Book</h3>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
-              {/* Freeze Spell */}
-              <button
-                className={`spell-button ${spellCastActive === 'freeze' ? 'active' : ''}`}
-                onClick={handleCastFreezeInitiate}
-                disabled={!isMyTurn || gameState.spells[playerColor].freeze === 0 || gameState.status !== 'active' || opponentDisconnected || gameState.spellCastThisTurn}
-              >
-                <span className="spell-icon">❄️</span>
-                <div className="spell-details">
-                  <span className="spell-name">Frost Freeze</span>
-                  <span className="spell-desc">Freeze an opponent's piece for 2 turns</span>
-                </div>
-                <span className={`spell-charge ${gameState.spells[playerColor].freeze === 0 ? 'depleted' : ''}`}>
-                  {gameState.spells[playerColor].freeze}/1
-                </span>
-              </button>
+          <SpellBook
+            spells={gameState.spells[playerColor]}
+            playerColor={playerColor}
+            isMyTurn={isMyTurn}
+            spellCastActive={spellCastActive}
+            moveChangerActive={moveChangerActive}
+            doubleMoveActive={doubleMoveActive}
+            gameState={gameState}
+            opponentDisconnected={opponentDisconnected}
+            onCastFreezeInitiate={handleCastFreezeInitiate}
+            onCastSelfSpell={handleCastSelfSpell}
+          />
 
-              {/* Double Move Spell */}
-              <button
-                className="spell-button"
-                onClick={() => handleCastSelfSpell('double_move')}
-                disabled={!isMyTurn || gameState.spells[playerColor].double_move === 0 || gameState.status !== 'active' || opponentDisconnected || doubleMoveActive || gameState.spellCastThisTurn}
-              >
-                <span className="spell-icon">⚡</span>
-                <div className="spell-details">
-                  <span className="spell-name">Time Warp (Double Move)</span>
-                  <span className="spell-desc">Take 2 moves in a row this turn</span>
-                </div>
-                <span className={`spell-charge ${gameState.spells[playerColor].double_move === 0 ? 'depleted' : ''}`}>
-                  {gameState.spells[playerColor].double_move}/1
-                </span>
-              </button>
+          <BattleLog
+            history={gameState.history}
+            getChessNotation={getChessNotation}
+          />
 
-              {/* Move Changer Spell */}
-              <button
-                className="spell-button"
-                onClick={() => handleCastSelfSpell('move_changer')}
-                disabled={!isMyTurn || gameState.spells[playerColor].move_changer === 0 || gameState.status !== 'active' || opponentDisconnected || moveChangerActive || gameState.spellCastThisTurn}
-              >
-                <span className="spell-icon">✨</span>
-                <div className="spell-details">
-                  <span className="spell-name">Move Changer</span>
-                  <span className="spell-desc">Bishops move like Kings, Queens like Knights (1 turn)</span>
-                </div>
-                <span className={`spell-charge ${gameState.spells[playerColor].move_changer === 0 ? 'depleted' : ''}`}>
-                  {gameState.spells[playerColor].move_changer}/1
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Battle Log Panel */}
-          <div className="glass-panel" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', minHeight: '160px', maxHeight: '200px' }}>
-            <h3 style={{ color: 'var(--primary-neon)', fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={18} style={{ stroke: 'var(--primary-neon)' }} />
-              Battle Log
-            </h3>
-            
-            <div ref={battleLogContainerRef} style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.95rem', paddingRight: '4px' }}>
-              {(!gameState?.history || gameState.history.length === 0) ? (
-                <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.85rem', textAlign: 'center', margin: 'auto' }}>No moves made yet.</p>
-              ) : (
-                gameState.history.map((hist, index) => {
-                  const playerLabel = hist.player === 'w' ? 'White' : 'Black';
-                  const labelColor = hist.player === 'w' ? '#e2fcfb' : 'var(--primary-neon)';
-                  const pieceSymbols = { p: '♙', r: '♖', n: '♘', b: '♗', q: '♕', k: '♔' };
-
-                  return (
-                    <div key={index} style={{ display: 'flex', gap: '8px', padding: '4px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px', borderLeft: `3px solid ${hist.player === 'w' ? '#66fcf1' : '#45a29e'}` }}>
-                      <span style={{ fontWeight: 'bold', color: labelColor }}>{playerLabel}:</span>
-                      <span style={{ color: 'var(--text-muted)' }}>
-                        {hist.type === 'move' ? (
-                          <>
-                            {pieceSymbols[hist.fromPiece?.type] || ''} {getChessNotation(hist.from.r, hist.from.c)} → {getChessNotation(hist.to.r, hist.to.c)}
-                          </>
-                        ) : (
-                          <>
-                            {hist.spellId === 'freeze' ? '❄️ casted Freeze' : (hist.spellId === 'double_move' ? '⚡ casted Double Move' : '✨ casted Move Changer')}
-                            {hist.targetPos && ` on ${getChessNotation(hist.targetPos.r, hist.targetPos.c)}`}
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Chat Panel */}
-          <div className="glass-panel chat-container">
-            <div style={{ padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <MessageSquare size={16} style={{ stroke: 'var(--primary-neon)' }} />
-              <h3 style={{ fontSize: '0.95rem', color: 'var(--primary-neon)' }}>Room Chat</h3>
-            </div>
-            
-            <div className="chat-messages">
-              {chatMessages.map((msg, index) => (
-                <div key={index} className="chat-message">
-                  <span className="chat-sender">{msg.sender}:</span>
-                  <span>{msg.message}</span>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-
-            <form onSubmit={handleSendChat} className="chat-input-form">
-              <input
-                type="text"
-                className="chat-input"
-                placeholder="Type your message..."
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-              />
-              <button type="submit" style={{ background: 'transparent', border: 'none', color: 'var(--primary-neon)' }}>
-                <Send size={18} />
-              </button>
-            </form>
-          </div>
+          <ChatPanel
+            chatMessages={chatMessages}
+            chatInput={chatInput}
+            setChatInput={setChatInput}
+            onSubmit={handleSendChat}
+          />
 
         </div>
       </div>
 
-      {/* Game Over / Opponent Disconnected Modal Dialog */}
-      {(gameState.status !== 'active' || opponentDisconnected || opponentLeftLobby) && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <div className="glass-panel" style={{ padding: '3rem', maxWidth: '450px', width: '90%', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '2px solid var(--primary-neon)' }}>
-            <h2 className={getConcludedClass()} style={{ fontSize: '2.5rem' }}>
-              {getConcludedTitle()}
-            </h2>
+      <ConcludedModal
+        isOpen={gameState.status !== 'active' || opponentDisconnected || opponentLeftLobby}
+        gameState={gameState}
+        playerColor={playerColor}
+        opponentLeftLobby={opponentLeftLobby}
+        opponentDisconnected={opponentDisconnected}
+        rematchRequested={rematchRequested}
+        onRematch={handleRematchRequest}
+        onLeave={handleLeaveGame}
+        getConcludedTitle={getConcludedTitle}
+        getConcludedClass={getConcludedClass}
+      />
 
-            <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
-              {opponentLeftLobby ? (
-                'Your opponent has left the room lobby.'
-              ) : opponentDisconnected ? (
-                'Your opponent disconnected from the match.'
-              ) : gameState.status === 'timeout' ? (
-                gameState.winner === playerColor ? '⏰ Timeout! You won on time! ⏰' : '⏰ Timeout! You ran out of time. ⏰'
-              ) : gameState.status === 'checkmate' ? (
-                gameState.winner === playerColor ? '🎉 Checkmate! You are victorious! 🎉' : '💀 Checkmate! You have been defeated. 💀'
-              ) : gameState.status === 'draw-agreement' ? (
-                ' Match ended in a Draw by Agreement. '
-              ) : (
-                ' Match ended in a Stalemate. '
-              )}
-            </p>
+      <PromotionModal
+        promotionPending={promotionPending}
+        onSelect={handleSelectPromotion}
+        onCancel={() => setPromotionPending(null)}
+      />
 
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', width: '100%', marginTop: '1rem' }}>
-              {!opponentDisconnected && !opponentLeftLobby && (
-                <button
-                  className="btn-primary"
-                  onClick={handleRematchRequest}
-                  disabled={rematchRequested[playerColor]}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <RefreshCw size={16} />
-                  {rematchRequested[playerColor] ? 'Waiting...' : 'Request Rematch'}
-                </button>
-              )}
-              <button className="btn-secondary" onClick={handleLeaveGame}>
-                Return to Lobby
-              </button>
-            </div>
-            
-            {!opponentDisconnected && !opponentLeftLobby && rematchRequested[playerColor === 'w' ? 'b' : 'w'] && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--primary-neon)' }}>Opponent has requested a rematch!</p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Pawn Promotion Modal Dialog */}
-      {promotionPending && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <div className="glass-panel" style={{ padding: '2.5rem', maxWidth: '400px', width: '90%', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '2px solid var(--primary-neon)' }}>
-            <h2 className="title-gradient" style={{ fontSize: '1.8rem' }}>Pawn Promotion</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Choose which piece to promote your pawn to:</p>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '0.5rem' }}>
-              {[
-                { type: 'q', label: 'Queen', icon: '♕' },
-                { type: 'r', label: 'Rook', icon: '♖' },
-                { type: 'b', label: 'Bishop', icon: '♗' },
-                { type: 'n', label: 'Knight', icon: '♘' }
-              ].map((opt) => (
-                <button
-                  key={opt.type}
-                  className="btn-secondary"
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '12px 6px', border: '1px solid rgba(255,255,255,0.08)' }}
-                  onClick={() => handleSelectPromotion(opt.type)}
-                >
-                  <span style={{ fontSize: '2.2rem', color: 'var(--primary-neon)', lineHeight: '1' }}>{opt.icon}</span>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{opt.label}</span>
-                </button>
-              ))}
-            </div>
-
-            <button className="btn-secondary" onClick={() => setPromotionPending(null)} style={{ marginTop: '0.5rem' }}>
-              Cancel Move
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Draw Offer Modal Dialog */}
-      {drawOfferReceived && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <div className="glass-panel" style={{ padding: '2.5rem', maxWidth: '400px', width: '90%', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '2px solid var(--primary-neon)' }}>
-            <h2 className="title-gradient" style={{ fontSize: '1.8rem' }}>Draw Offered</h2>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Your opponent has offered a Draw. Would you like to accept it?</p>
-            
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', width: '100%', marginTop: '1rem' }}>
-              <button className="btn-primary" onClick={() => handleRespondDraw(true)} style={{ flex: 1 }}>
-                Accept Draw
-              </button>
-              <button className="btn-secondary" onClick={() => handleRespondDraw(false)} style={{ flex: 1 }}>
-                Decline Draw
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DrawOfferModal
+        isOpen={drawOfferReceived}
+        onAccept={() => handleRespondDraw(true)}
+        onDecline={() => handleRespondDraw(false)}
+      />
     </div>
   );
 };
