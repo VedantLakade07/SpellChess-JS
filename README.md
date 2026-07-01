@@ -61,7 +61,7 @@ Each spell can only be cast once per player per match — no restocking, no seco
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/SpellChess-online.git
+git clone https://github.com/VedantLakade07/SpellChess-online.git
 cd SpellChess-online
 ```
 
@@ -69,14 +69,22 @@ cd SpellChess-online
 
 ```bash
 cd server
-cp .env.example .env
 ```
 
-Open `server/.env` and set your values:
+**On Mac/Linux:**
+```bash
+cp .env.example .env
+```
+**On Windows:**
+```bash
+copy .env.example .env
+```
+
+Open `server/.env` and fill in your values:
 
 ```env
 PORT=5000
-JWT_SECRET=your-super-secret-key-change-this   # Use a long random string!
+JWT_SECRET=your-super-secret-key-change-this
 DB_PATH=./spellchess.db
 CLIENT_ORIGIN=http://localhost:5173
 ```
@@ -89,18 +97,30 @@ npm install
 npm start
 ```
 
+✅ On first run, the server **automatically creates the SQLite database** and all tables — no manual database setup needed.
+
 The server will run on **http://localhost:5000**
+
+---
 
 ### 3. Set up the Client
 
-Open a new terminal:
+Open a **new terminal** (keep the server running):
 
 ```bash
 cd client
-cp .env.example .env
 ```
 
-Open `client/.env` and verify:
+**On Mac/Linux:**
+```bash
+cp .env.example .env
+```
+**On Windows:**
+```bash
+copy .env.example .env
+```
+
+Open `client/.env` — the defaults work for local dev:
 
 ```env
 VITE_API_URL=http://localhost:5000/api/auth
@@ -116,13 +136,15 @@ npm run dev
 
 The frontend will run on **http://localhost:5173**
 
+---
+
 ### 4. Play!
 
-1. Open **http://localhost:5173** in two separate browser tabs (or on two devices on the same network)
-2. Register an account in each tab
-3. In Tab 1: Click **Create Room** and copy the 6-digit room code
-4. In Tab 2: Paste the room code into **Join Room** and click Join
-5. The game starts automatically when both players are in the room
+1. Open **http://localhost:5173** in **two separate browser tabs**
+2. **Register** a different account in each tab
+3. In **Tab 1** → Click **Create Room** → Copy the 6-digit room code
+4. In **Tab 2** → Paste the room code → Click **Join Game**
+5. The match starts automatically once both players are in the room 🎮
 
 
 ---
