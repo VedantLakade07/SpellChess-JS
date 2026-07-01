@@ -319,32 +319,7 @@ const getLegalMoves = (state, r, c) => {
   const piece = state.board[r][c];
   if (!piece || piece.color !== state.turn) return [];
 
-  const rawMoves = getRawMoves(state.board, r, c, state.activeSpells);
-  const legalMoves = [];
-
-  for (const move of rawMoves) {
-    // Simulate move
-    const tempBoard = cloneBoard(state.board);
-    const movingPiece = tempBoard[r][c];
-
-    // Handle normal moving & capturing
-    tempBoard[move.r][move.c] = { ...movingPiece, hasMoved: true };
-    tempBoard[r][c] = null;
-
-    // Handle castling simulation
-    if (move.isCastle) {
-      const rook = tempBoard[move.rookFrom.r][move.rookFrom.c];
-      tempBoard[move.rookTo.r][move.rookTo.c] = { ...rook, hasMoved: true };
-      tempBoard[move.rookFrom.r][move.rookFrom.c] = null;
-    }
-
-    // Check if move leaves king in check
-    if (!isKingInCheck(tempBoard, state.turn, state.activeSpells)) {
-      legalMoves.push(move);
-    }
-  }
-
-  return legalMoves;
+  return getRawMoves(state.board, r, c, state.activeSpells);
 };
 
 // Check if player has any legal moves
@@ -433,18 +408,12 @@ const makeMove = (state, from, to) => {
     state.spellCastThisTurn = false; // Reset spell cast flag for the new player's turn
   }
 
-  // Check game over statuses (Checkmate / Stalemate)
+  // Draw if player has absolutely no legal moves available
   const nextPlayer = state.turn;
-  const inCheck = isKingInCheck(state.board, nextPlayer, state.activeSpells);
   const movesAvailable = hasAnyLegalMoves(state, nextPlayer);
 
   if (!movesAvailable) {
-    if (inCheck) {
-      state.winner = state.turn === 'w' ? 'b' : 'w'; // Previous player won
-      state.status = 'checkmate';
-    } else {
-      state.status = 'stalemate';
-    }
+    state.status = 'draw';
   }
 
   return true;

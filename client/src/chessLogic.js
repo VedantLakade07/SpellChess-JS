@@ -307,28 +307,7 @@ export const getLegalMoves = (state, r, c) => {
   const piece = state.board[r][c];
   if (!piece || piece.color !== state.turn) return [];
 
-  const rawMoves = getRawMoves(state.board, r, c, state.activeSpells);
-  const legalMoves = [];
-
-  for (const move of rawMoves) {
-    const tempBoard = cloneBoard(state.board);
-    const movingPiece = tempBoard[r][c];
-
-    tempBoard[move.r][move.c] = { ...movingPiece, hasMoved: true };
-    tempBoard[r][c] = null;
-
-    if (move.isCastle) {
-      const rook = tempBoard[move.rookFrom.r][move.rookFrom.c];
-      tempBoard[move.rookTo.r][move.rookTo.c] = { ...rook, hasMoved: true };
-      tempBoard[move.rookFrom.r][move.rookFrom.c] = null;
-    }
-
-    if (!isKingInCheck(tempBoard, state.turn, state.activeSpells)) {
-      legalMoves.push(move);
-    }
-  }
-
-  return legalMoves;
+  return getRawMoves(state.board, r, c, state.activeSpells);
 };
 
 export const hasAnyLegalMoves = (state, color) => {
@@ -403,17 +382,12 @@ export const makeMove = (state, from, to) => {
     state.spellCastThisTurn = false;
   }
 
+  // Draw if player has absolutely no legal moves available
   const nextPlayer = state.turn;
-  const inCheck = isKingInCheck(state.board, nextPlayer, state.activeSpells);
   const movesAvailable = hasAnyLegalMoves(state, nextPlayer);
 
   if (!movesAvailable) {
-    if (inCheck) {
-      state.winner = state.turn === 'w' ? 'b' : 'w';
-      state.status = 'checkmate';
-    } else {
-      state.status = 'stalemate';
-    }
+    state.status = 'draw';
   }
 
   return true;

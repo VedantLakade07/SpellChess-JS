@@ -19,6 +19,37 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   const [opponentLeftLobby, setOpponentLeftLobby] = useState(false);
 
   const chatEndRef = useRef(null);
+  const [clocks, setClocks] = useState({ w: 600, b: 600 });
+
+  useEffect(() => {
+    if (gameState && gameState.clocks) {
+      setClocks(gameState.clocks);
+    }
+  }, [gameState]);
+
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'active' || opponentDisconnected || opponentLeftLobby) return;
+
+    const activeColor = gameState.turn;
+
+    const interval = setInterval(() => {
+      setClocks(prev => {
+        const nextClocks = {
+          ...prev,
+          [activeColor]: Math.max(0, prev[activeColor] - 1)
+        };
+        return nextClocks;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState?.turn, gameState?.status, opponentDisconnected, opponentLeftLobby]);
+
+  const formatTime = (timeInSeconds) => {
+    const mins = Math.floor(timeInSeconds / 60);
+    const secs = timeInSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     // Scroll chat to bottom on new messages
@@ -26,6 +57,14 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   }, [chatMessages]);
 
   useEffect(() => {
+    // Request current room state on mount to prevent lobby race conditions
+    socket.emit('get-room-state', { roomId });
+
+    socket.on('room-state', ({ players: p, gameState: gs }) => {
+      if (p) setPlayers(p);
+      if (gs) setGameState(gs);
+    });
+
     // Sockets listeners
     socket.on('game-start', ({ players: p, gameState: gs }) => {
       setPlayers(p);
@@ -71,6 +110,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
     });
 
     return () => {
+      socket.off('room-state');
       socket.off('game-start');
       socket.off('state-updated');
       socket.off('spell-cast-alert');
@@ -208,7 +248,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   };
 
   // Render variables
-  if (!gameState) {
+  if (!gameState || !players.w || !players.b) {
     return (
       <div className="glass-panel" style={{ padding: '3rem', margin: 'auto', maxWidth: '500px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center' }}>
         <h3 className="title-gradient" style={{ fontSize: '1.8rem' }}>Waiting for Opponent</h3>
@@ -238,6 +278,31 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   // Active spells checks for active player glow
   const doubleMoveActive = gameState.activeSpells[playerColor]?.doubleMove;
   const moveChangerActive = gameState.activeSpells[playerColor]?.moveChanger;
+
+  const getConcludedTitle = () => {
+    if (opponentLeftLobby) return 'Opponent Left';
+    if (opponentDisconnected) return 'Match Aborted';
+    
+    if (gameState.status === 'checkmate' || gameState.status === 'timeout') {
+      return gameState.winner === playerColor ? 'YOU WON' : 'YOU LOST';
+    }
+    
+    if (gameState.status === 'stalemate' || gameState.status === 'draw') {
+      return 'MATCH DRAWN';
+    }
+    
+    return 'Match Concluded';
+  };
+
+  const getConcludedClass = () => {
+    if (opponentLeftLobby || opponentDisconnected) return 'title-gradient';
+    
+    if (gameState.status === 'checkmate' || gameState.status === 'timeout') {
+      return gameState.winner === playerColor ? 'win-gradient' : 'lose-gradient';
+    }
+    
+    return 'title-gradient';
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', width: '100%' }}>
@@ -284,9 +349,14 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
             <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
               {playerColor === 'w' ? players.b?.username : players.w?.username} (Opponent)
             </span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              {!isMyTurn && gameState.status === 'active' && !opponentDisconnected ? 'Thinking...' : ''}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              {!isMyTurn && gameState.status === 'active' && !opponentDisconnected && <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Thinking...</span>}
+              {gameState?.clocks && (
+                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'monospace', color: !isMyTurn ? 'var(--primary-neon)' : 'var(--text-muted)' }}>
+                  {formatTime(clocks[playerColor === 'w' ? 'b' : 'w'])}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Chess Board */}
@@ -353,9 +423,16 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
             <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>
               {playerColor === 'w' ? players.w?.username : players.b?.username} (You)
             </span>
-            <span style={{ fontSize: '0.85rem', color: isMyTurn ? 'var(--primary-neon)' : 'var(--text-muted)', fontWeight: isMyTurn ? 'bold' : 'normal' }}>
-              {opponentDisconnected ? 'Opponent Disconnected' : (isMyTurn && gameState.status === 'active' ? 'YOUR TURN' : 'Opponent\'s Turn')}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+              <span style={{ fontSize: '0.85rem', color: isMyTurn ? 'var(--primary-neon)' : 'var(--text-muted)', fontWeight: isMyTurn ? 'bold' : 'normal' }}>
+                {opponentDisconnected ? 'Opponent Disconnected' : (isMyTurn && gameState.status === 'active' ? 'YOUR TURN' : 'Opponent\'s Turn')}
+              </span>
+              {gameState?.clocks && (
+                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'monospace', color: isMyTurn ? 'var(--primary-neon)' : 'var(--text-muted)' }}>
+                  {formatTime(clocks[playerColor])}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -458,8 +535,8 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
           background: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
           <div className="glass-panel" style={{ padding: '3rem', maxWidth: '450px', width: '90%', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '2px solid var(--primary-neon)' }}>
-            <h2 className="title-gradient" style={{ fontSize: '2rem' }}>
-              {opponentLeftLobby ? 'Opponent Left' : (opponentDisconnected ? 'Match Aborted' : 'Match Concluded')}
+            <h2 className={getConcludedClass()} style={{ fontSize: '2.5rem' }}>
+              {getConcludedTitle()}
             </h2>
 
             <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>
@@ -467,6 +544,8 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
                 'Your opponent has left the room lobby.'
               ) : opponentDisconnected ? (
                 'Your opponent disconnected from the match.'
+              ) : gameState.status === 'timeout' ? (
+                gameState.winner === playerColor ? '⏰ Timeout! You won on time! ⏰' : '⏰ Timeout! You ran out of time. ⏰'
               ) : gameState.status === 'checkmate' ? (
                 gameState.winner === playerColor ? '🎉 Checkmate! You are victorious! 🎉' : '💀 Checkmate! You have been defeated. 💀'
               ) : (

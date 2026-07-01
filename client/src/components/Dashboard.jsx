@@ -9,6 +9,9 @@ const Dashboard = ({ onCreateRoom, onJoinRoom }) => {
   const [roomCode, setRoomCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedTime, setSelectedTime] = useState(10);
+  const [selectedColor, setSelectedColor] = useState('random');
 
   useEffect(() => {
     let active = true;
@@ -28,8 +31,18 @@ const Dashboard = ({ onCreateRoom, onJoinRoom }) => {
   }, []);
 
   const handleCreateGame = () => {
+    setShowCreateModal(true);
+  };
+
+  const handleConfirmCreate = () => {
+    setShowCreateModal(false);
     if (!socket.connected) socket.connect();
-    socket.emit('create-room', { userId: user.id, username: user.username });
+    socket.emit('create-room', { 
+      userId: user.id, 
+      username: user.username,
+      timeLimit: selectedTime,
+      preferredColor: selectedColor
+    });
     
     socket.once('room-created', ({ roomId, color }) => {
       onCreateRoom(roomId, color);
@@ -204,6 +217,77 @@ const Dashboard = ({ onCreateRoom, onJoinRoom }) => {
           )}
         </div>
       </div>
+      {/* Create Room Options Modal Dialog */}
+      {showCreateModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="glass-panel" style={{ padding: '2.5rem', maxWidth: '400px', width: '90%', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '2px solid var(--primary-neon)' }}>
+            <h3 className="title-gradient" style={{ fontSize: '1.6rem', textAlign: 'center', marginBottom: '0.5rem' }}>Create Room</h3>
+            
+            {/* Time selection */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 'bold' }}>SELECT TIME LIMIT</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                {[5, 10, 30].map(time => (
+                  <button
+                    key={time}
+                    type="button"
+                    onClick={() => setSelectedTime(time)}
+                    className={selectedTime === time ? 'btn-primary' : 'btn-secondary'}
+                    style={{ padding: '10px 0', fontSize: '0.9rem' }}
+                  >
+                    {time} Min
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Color selection */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 'bold' }}>CHOOSE PIECE COLOR</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                {[
+                  { value: 'w', label: 'White' },
+                  { value: 'random', label: 'Random' },
+                  { value: 'b', label: 'Black' }
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSelectedColor(opt.value)}
+                    className={selectedColor === opt.value ? 'btn-primary' : 'btn-secondary'}
+                    style={{ padding: '10px 0', fontSize: '0.9rem' }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+              <button 
+                type="button"
+                className="btn-primary" 
+                onClick={handleConfirmCreate}
+                style={{ flex: 1, padding: '12px' }}
+              >
+                Create Room
+              </button>
+              <button 
+                type="button"
+                className="btn-secondary" 
+                onClick={() => setShowCreateModal(false)}
+                style={{ flex: 1, padding: '12px' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -147,6 +147,22 @@ button {
   text-transform: uppercase;
 }
 
+.win-gradient {
+  background: linear-gradient(to right, #00ff87, #60efff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.lose-gradient {
+  background: linear-gradient(to right, #ff007f, #ff4e50);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 /* Chessboard Styling */
 .chessboard-container {
   display: grid;
