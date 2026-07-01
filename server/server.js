@@ -10,6 +10,7 @@ const chessLogic = require('./chessLogic');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
+app.set('trust proxy', 1); // trust first proxy
 app.use(cors({
   origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
   methods: ['GET', 'POST', 'OPTIONS'],
