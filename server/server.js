@@ -68,8 +68,8 @@ const generateRoomId = () => {
   return code;
 };
 
-// Clean up rooms on player disconnect
-const handleUserDisconnect = (socket) => {
+// Clean up rooms on player disconnect with a reconnection grace period
+const handleUserDisconnect = (socket, isExplicitLeave = false) => {
   for (const [roomId, room] of rooms.entries()) {
     let disconnectedColor = null;
 
@@ -80,35 +80,86 @@ const handleUserDisconnect = (socket) => {
     }
 
     if (disconnectedColor) {
-      // Notify the opponent
+      const player = room.players[disconnectedColor];
+      player.socketId = null; // Clear socket reference
+
       const opponentColor = disconnectedColor === 'w' ? 'b' : 'w';
       const opponent = room.players[opponentColor];
 
-      if (opponent) {
-        const isGameActive = room.gameState && room.gameState.status === 'active';
-
-        if (isGameActive) {
-          io.to(opponent.socketId).emit('opponent-disconnected', {
-            message: 'Your opponent disconnected. You win by default or can leave.'
-          });
-
-          room.gameState.status = 'aborted';
-          room.gameState.winner = opponentColor;
-          
-          // Save to match history asynchronously
-          saveMatchToDb(roomId, room, opponent.userId).catch(err => 
-            console.error('Error saving aborted match to DB:', err)
-          );
-        } else {
-          io.to(opponent.socketId).emit('opponent-left-lobby', {
-            message: 'Your opponent has left the lobby.'
-          });
-        }
+      // If both players are now disconnected, clean up the room immediately
+      if (!opponent || !opponent.socketId) {
+        if (room.disconnectTimeout) clearTimeout(room.disconnectTimeout);
+        if (room.timeoutId) clearTimeout(room.timeoutId);
+        rooms.delete(roomId);
+        console.log(`Room ${roomId} deleted because both players disconnected.`);
+        continue;
       }
 
-      // Remove the room immediately or keep it for spectator sync
-      rooms.delete(roomId);
-      console.log(`Room ${roomId} deleted because player ${disconnectedColor} disconnected.`);
+      const isGameActive = room.gameState && room.gameState.status === 'active';
+
+      if (isGameActive && !isExplicitLeave) {
+        // Notify the opponent and start grace period
+        io.to(opponent.socketId).emit('opponent-disconnected', {
+          message: 'Your opponent disconnected. Waiting 30 seconds for reconnection...'
+        });
+
+        if (room.disconnectTimeout) clearTimeout(room.disconnectTimeout);
+        room.disconnectTimeout = setTimeout(async () => {
+          try {
+            const currentRoom = rooms.get(roomId);
+            if (!currentRoom || currentRoom.gameState.status !== 'active') return;
+
+            console.log(`Grace period expired. Aborting match ${roomId}.`);
+            currentRoom.gameState.status = 'aborted';
+            currentRoom.gameState.winner = opponentColor;
+
+            if (currentRoom.timeoutId) {
+              clearTimeout(currentRoom.timeoutId);
+              currentRoom.timeoutId = null;
+            }
+
+            await saveMatchToDb(roomId, currentRoom, opponent.userId);
+
+            io.to(opponent.socketId).emit('state-updated', currentRoom.gameState);
+            io.to(opponent.socketId).emit('game-over', {
+              winner: opponentColor,
+              status: 'aborted',
+              message: 'Opponent failed to reconnect.'
+            });
+
+            rooms.delete(roomId);
+          } catch (err) {
+            console.error('Error handling disconnect timeout:', err);
+          }
+        }, 30000); // 30 seconds grace period
+
+        console.log(`Player ${disconnectedColor} disconnected from active game ${roomId}. 30s grace period started.`);
+      } else {
+        // If lobby not active, or explicit leave, clean up immediately
+        if (opponent.socketId) {
+          if (isGameActive) {
+            room.gameState.status = 'aborted';
+            room.gameState.winner = opponentColor;
+            saveMatchToDb(roomId, room, opponent.userId).catch(err => console.error(err));
+            
+            io.to(opponent.socketId).emit('state-updated', room.gameState);
+            io.to(opponent.socketId).emit('game-over', {
+              winner: opponentColor,
+              status: 'aborted',
+              message: 'Opponent left the match.'
+            });
+          } else {
+            io.to(opponent.socketId).emit('opponent-left-lobby', {
+              message: 'Your opponent has left the lobby.'
+            });
+          }
+        }
+        
+        if (room.disconnectTimeout) clearTimeout(room.disconnectTimeout);
+        if (room.timeoutId) clearTimeout(room.timeoutId);
+        rooms.delete(roomId);
+        console.log(`Room ${roomId} deleted because player left or game was aborted.`);
+      }
     }
   }
 };
@@ -290,6 +341,61 @@ io.on('connection', (socket) => {
       });
       console.log(`Room ${roomId} fully occupied. Game starting.`);
     }
+  });
+
+  // Event: Rejoin room (handles reconnection during active matches)
+  socket.on('rejoin-room', ({ roomId, userId }) => {
+    if (typeof roomId !== 'string' || !/^[a-zA-Z0-9]+$/.test(roomId)) {
+      return socket.emit('join-error', { message: 'Invalid room code.' });
+    }
+    const room = rooms.get(roomId);
+
+    if (!room) {
+      return socket.emit('join-error', { message: 'Room not found.' });
+    }
+
+    // Verify if this user belongs to the room and matches one of the players
+    let playerColor = null;
+    if (room.players.w && room.players.w.userId === userId) {
+      playerColor = 'w';
+    } else if (room.players.b && room.players.b.userId === userId) {
+      playerColor = 'b';
+    }
+
+    if (!playerColor) {
+      return socket.emit('join-error', { message: 'You are not a player in this room.' });
+    }
+
+    // Update player socket ID and rejoin
+    room.players[playerColor].socketId = socket.id;
+    socket.join(roomId);
+
+    // Cancel any active disconnect timeouts
+    if (room.disconnectTimeout) {
+      clearTimeout(room.disconnectTimeout);
+      room.disconnectTimeout = null;
+      console.log(`Player ${playerColor} reconnected to room ${roomId}. Disconnect timeout cancelled.`);
+    }
+
+    // Notify the other player
+    const opponentColor = playerColor === 'w' ? 'b' : 'w';
+    const opponent = room.players[opponentColor];
+    if (opponent && opponent.socketId) {
+      io.to(opponent.socketId).emit('opponent-reconnected', {
+        message: 'Your opponent has reconnected.'
+      });
+    }
+
+    // Send latest room state to the reconnected player
+    socket.emit('room-state', {
+      players: {
+        w: room.players.w ? { username: room.players.w.username, id: room.players.w.userId } : null,
+        b: room.players.b ? { username: room.players.b.username, id: room.players.b.userId } : null
+      },
+      gameState: room.gameState
+    });
+
+    console.log(`Player ${room.players[playerColor].username} (${playerColor}) rejoined room ${roomId} on socket ${socket.id}`);
   });
 
   // Event: Make a move
@@ -494,7 +600,7 @@ io.on('connection', (socket) => {
       room.timeoutId = null;
     }
     socket.leave(roomId);
-    handleUserDisconnect(socket);
+    handleUserDisconnect(socket, true);
   });
 
   socket.on('disconnect', () => {

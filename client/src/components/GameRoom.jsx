@@ -10,8 +10,10 @@ import DrawOfferModal from './DrawOfferModal';
 import ConcludedModal from './ConcludedModal';
 import SpellBook from './SpellBook';
 import { playMoveSound, playCaptureSound, playSpellSound, playGameOverSound } from '../utils/audio';
+import { useAuth } from '../context/AuthContext';
 
 const GameRoom = ({ roomId, playerColor, onLeave }) => {
+  const { user } = useAuth();
   const [gameState, setGameState] = useState(null);
   const [players, setPlayers] = useState({ w: null, b: null });
   const [selectedSquare, setSelectedSquare] = useState(null);
@@ -109,8 +111,30 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   };
 
   useEffect(() => {
-    // Request current room state on mount to prevent lobby race conditions
-    socket.emit('get-room-state', { roomId });
+    const handleConnect = () => {
+      setSpellAlert({ message: 'Connected to game server!', color: 'w' });
+      setTimeout(() => setSpellAlert(null), 2500);
+      if (user && user.id) {
+        socket.emit('rejoin-room', { roomId, userId: user.id });
+      } else {
+        socket.emit('get-room-state', { roomId });
+      }
+    };
+
+    const handleDisconnect = () => {
+      setSpellAlert({ message: 'You disconnected. Trying to reconnect...', color: 'error' });
+    };
+
+    if (socket.connected) {
+      if (user && user.id) {
+        socket.emit('rejoin-room', { roomId, userId: user.id });
+      } else {
+        socket.emit('get-room-state', { roomId });
+      }
+    }
+
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
 
     socket.on('room-state', ({ players: p, gameState: gs }) => {
       if (p) setPlayers(p);
@@ -161,8 +185,19 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       setRematchRequested((prev) => ({ ...prev, [color]: true }));
     });
 
-    socket.on('opponent-disconnected', () => {
-      setOpponentDisconnected(true);
+    socket.on('opponent-disconnected', ({ message }) => {
+      setSpellAlert({ message: message || 'Opponent disconnected. Waiting 30s for reconnection...', color: 'error' });
+    });
+
+    socket.on('opponent-reconnected', ({ message }) => {
+      setSpellAlert({ message: message || 'Opponent reconnected!', color: 'w' });
+      setTimeout(() => setSpellAlert(null), 3000);
+    });
+
+    socket.on('game-over', ({ winner, status, message }) => {
+      if (status === 'aborted') {
+        setOpponentDisconnected(true);
+      }
     });
 
     socket.on('opponent-left-lobby', () => {
@@ -175,6 +210,8 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
     });
 
     return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
       socket.off('room-state');
       socket.off('game-start');
       socket.off('state-updated');
@@ -182,12 +219,14 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       socket.off('chat-message');
       socket.off('rematch-requested');
       socket.off('opponent-disconnected');
+      socket.off('opponent-reconnected');
+      socket.off('game-over');
       socket.off('opponent-left-lobby');
       socket.off('error-msg');
       socket.off('draw-offered');
       socket.off('draw-declined');
     };
-  }, []);
+  }, [roomId, user?.id]);
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomId);
