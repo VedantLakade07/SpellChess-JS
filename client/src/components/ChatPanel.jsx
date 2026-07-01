@@ -2,10 +2,12 @@ import React, { useRef, useEffect } from 'react';
 import { MessageSquare, Send } from 'lucide-react';
 
 const ChatPanel = ({ chatMessages, chatInput, setChatInput, onSubmit }) => {
-  const chatEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [chatMessages]);
 
   return (
@@ -15,14 +17,13 @@ const ChatPanel = ({ chatMessages, chatInput, setChatInput, onSubmit }) => {
         <h3 style={{ fontSize: '0.95rem', color: 'var(--primary-neon)' }}>Room Chat</h3>
       </div>
       
-      <div className="chat-messages">
+      <div ref={chatContainerRef} className="chat-messages">
         {chatMessages.map((msg, index) => (
           <div key={index} className="chat-message">
             <span className="chat-sender">{msg.sender}:</span>
             <span>{msg.message}</span>
           </div>
         ))}
-        <div ref={chatEndRef} />
       </div>
 
       <form onSubmit={onSubmit} className="chat-input-form">

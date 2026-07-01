@@ -35,9 +35,9 @@ const ConcludedModal = ({
           ) : gameState?.status === 'checkmate' ? (
             gameState.winner === playerColor ? '🎉 Checkmate! You are victorious! 🎉' : '💀 Checkmate! You have been defeated. 💀'
           ) : gameState?.status === 'draw-agreement' ? (
-            '🤝 Match ended in a Draw by Agreement. 🤝'
+            ' Match ended in a Draw by Agreement. '
           ) : (
-            '🤝 Match ended in a Stalemate. 🤝'
+            ' Match ended in a Stalemate. '
           )}
         </p>
 
