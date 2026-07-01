@@ -44,6 +44,11 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Username must be between 3 and 20 characters' });
     }
 
+    const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({ error: 'Username can only contain letters, numbers, underscores, and dashes (no spaces or special characters).' });
+    }
+
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters long' });
     }

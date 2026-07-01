@@ -248,6 +248,9 @@ io.on('connection', (socket) => {
 
   // Event: Join room
   socket.on('join-room', ({ roomId, userId, username }) => {
+    if (typeof roomId !== 'string' || !/^[a-zA-Z0-9]+$/.test(roomId)) {
+      return socket.emit('join-error', { message: 'Invalid room code.' });
+    }
     const room = rooms.get(roomId);
 
     if (!room) {
@@ -313,7 +316,11 @@ io.on('connection', (socket) => {
 
     const fromPiece = room.gameState.board[from.r][from.c];
     const targetPiece = room.gameState.board[to.r][to.c];
-    const isCapture = targetPiece !== null && targetPiece !== undefined;
+    const isEnPassantCapture = fromPiece?.type === 'p' && 
+                               room.gameState.enPassantTarget && 
+                               to.r === room.gameState.enPassantTarget.r && 
+                               to.c === room.gameState.enPassantTarget.c;
+    const isCapture = (targetPiece !== null && targetPiece !== undefined) || isEnPassantCapture;
 
     const success = chessLogic.makeMove(room.gameState, from, to, promotion);
 

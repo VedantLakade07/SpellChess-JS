@@ -32,8 +32,11 @@ body {
   font-family: var(--font-body);
   background-color: var(--bg-dark);
   background-image: 
-    radial-gradient(at 10% 20%, rgba(102, 252, 241, 0.08) 0px, transparent 50%),
-    radial-gradient(at 90% 80%, rgba(155, 93, 229, 0.08) 0px, transparent 50%);
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(102, 252, 241, 0.10) 0px, transparent 60%),
+    radial-gradient(ellipse 80% 60% at 90% 80%, rgba(155, 93, 229, 0.10) 0px, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 50% 50%, rgba(69, 162, 158, 0.05) 0px, transparent 70%);
+  background-attachment: fixed;
+  background-size: cover;
   color: var(--text-white);
   min-height: 100vh;
   display: flex;
@@ -130,6 +133,12 @@ button {
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
+}
+
+@media (max-width: 600px) {
+  .app-container {
+    padding: 1.2rem 1rem;
+  }
 }
 
 .auth-card {
@@ -500,3 +509,53 @@ button {
   color: var(--text-muted);
   text-transform: uppercase;
 }
+
+/* Responsive Dashboard Styles */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.join-form {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.join-form .input-field {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .dashboard-grid {
+    grid-template-columns: 380px 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .join-form {
+    flex-direction: column;
+  }
+  .join-form .input-field {
+    width: 100%;
+    text-align: center;
+  }
+  .join-form button {
+    width: 100%;
+    justify-content: center;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+  }
+  .stat-box {
+    padding: 1rem 0.5rem;
+  }
+  .stat-value {
+    font-size: 1.5rem;
+  }
+}
+

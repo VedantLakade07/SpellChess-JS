@@ -38,6 +38,7 @@ const createInitialGameState = () => ({
   doubleMoveStep: 0, // 0 = normal, 1 = completed 1st move of double move, waiting for 2nd
   spellCastThisTurn: false,
   lastMove: null, // { from: {r, c}, to: {r, c}, piece }
+  enPassantTarget: null, // { r, c } or null
   winner: null,
   status: 'active', // 'active', 'checkmate', 'draw', 'stalemate'
   frozenPieceCount: 0
@@ -66,6 +67,7 @@ const cloneGameState = (state) => {
     doubleMoveStep: state.doubleMoveStep,
     spellCastThisTurn: state.spellCastThisTurn,
     lastMove: state.lastMove ? { ...state.lastMove } : null,
+    enPassantTarget: state.enPassantTarget ? { ...state.enPassantTarget } : null,
     winner: state.winner,
     status: state.status
   };
@@ -74,7 +76,7 @@ const cloneGameState = (state) => {
 const inBounds = (r, c) => r >= 0 && r < 8 && c >= 0 && c < 8;
 
 // Get raw valid moves for a piece (ignoring check protection)
-const getRawMoves = (board, r, c, activeSpells = {}) => {
+const getRawMoves = (board, r, c, activeSpells = {}, enPassantTarget = null) => {
   const piece = board[r][c];
   if (!piece) return [];
   if (piece.frozenTurns > 0) return []; // Frozen pieces cannot move
@@ -149,6 +151,8 @@ const getRawMoves = (board, r, c, activeSpells = {}) => {
           const dest = board[nr][nc];
           if (dest && dest.color !== color) {
             moves.push({ r: nr, c: nc });
+          } else if (enPassantTarget && enPassantTarget.r === nr && enPassantTarget.c === nc) {
+            moves.push({ r: nr, c: nc, isEnPassant: true });
           }
         }
       }
@@ -319,7 +323,7 @@ const getLegalMoves = (state, r, c) => {
   const piece = state.board[r][c];
   if (!piece || piece.color !== state.turn) return [];
 
-  return getRawMoves(state.board, r, c, state.activeSpells);
+  return getRawMoves(state.board, r, c, state.activeSpells, state.enPassantTarget);
 };
 
 // Check if player has any legal moves
@@ -360,6 +364,11 @@ const makeMove = (state, from, to, promotion = 'q') => {
     return true;
   }
 
+  // Handle En Passant capture
+  if (matchedMove.isEnPassant) {
+    state.board[from.r][to.c] = null;
+  }
+
   // Update piece position on board
   state.board[to.r][to.c] = { ...piece, hasMoved: true };
   state.board[from.r][from.c] = null;
@@ -377,6 +386,13 @@ const makeMove = (state, from, to, promotion = 'q') => {
   }
 
   state.lastMove = { from, to, piece };
+
+  // Update enPassantTarget
+  if (piece.type === 'p' && Math.abs(to.r - from.r) === 2) {
+    state.enPassantTarget = { r: (from.r + to.r) / 2, c: from.c };
+  } else {
+    state.enPassantTarget = null;
+  }
 
   // Double Move state transitions
   if (state.activeSpells[state.turn].doubleMove && state.doubleMoveStep === 0) {
