@@ -17,6 +17,8 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   const [spellAlert, setSpellAlert] = useState(null); // { message, color }
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [opponentLeftLobby, setOpponentLeftLobby] = useState(false);
+  const [drawOfferedByMe, setDrawOfferedByMe] = useState(false);
+  const [drawOfferReceived, setDrawOfferReceived] = useState(false);
 
   const chatEndRef = useRef(null);
   const battleLogContainerRef = useRef(null);
@@ -87,6 +89,18 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       setRematchRequested({ w: false, b: false });
       setOpponentDisconnected(false);
       setOpponentLeftLobby(false);
+      setDrawOfferedByMe(false);
+      setDrawOfferReceived(false);
+    });
+
+    socket.on('draw-offered', () => {
+      setDrawOfferReceived(true);
+    });
+
+    socket.on('draw-declined', () => {
+      setSpellAlert({ message: 'Opponent declined your draw offer.', color: 'error' });
+      setTimeout(() => setSpellAlert(null), 4000);
+      setDrawOfferedByMe(false);
     });
 
     socket.on('state-updated', (gs) => {
@@ -121,7 +135,8 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
     });
 
     socket.on('error-msg', ({ message }) => {
-      alert(message);
+      setSpellAlert({ message, color: 'error' });
+      setTimeout(() => setSpellAlert(null), 4000);
     });
 
     return () => {
@@ -134,6 +149,8 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       socket.off('opponent-disconnected');
       socket.off('opponent-left-lobby');
       socket.off('error-msg');
+      socket.off('draw-offered');
+      socket.off('draw-declined');
     };
   }, []);
 
@@ -285,6 +302,17 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
     onLeave();
   };
 
+  const handleOfferDraw = () => {
+    if (!gameState || gameState.status !== 'active') return;
+    socket.emit('offer-draw', { roomId });
+    setDrawOfferedByMe(true);
+  };
+
+  const handleRespondDraw = (accept) => {
+    socket.emit('respond-draw', { roomId, accept });
+    setDrawOfferReceived(false);
+  };
+
   // Render variables
   if (!gameState || !players.w || !players.b) {
     return (
@@ -325,7 +353,7 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       return gameState.winner === playerColor ? 'YOU WON' : 'YOU LOST';
     }
     
-    if (gameState.status === 'stalemate' || gameState.status === 'draw') {
+    if (gameState.status === 'stalemate' || gameState.status === 'draw' || gameState.status === 'draw-agreement') {
       return 'MATCH DRAWN';
     }
     
@@ -347,22 +375,63 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       {/* Alert Banner for Spell Casts */}
       {spellAlert && (
         <div style={{
-          position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)',
-          background: spellAlert.color === 'w' ? 'rgba(102, 252, 241, 0.95)' : 'rgba(155, 93, 229, 0.95)',
-          color: spellAlert.color === 'w' ? 'black' : 'white',
-          padding: '12px 24px', borderRadius: '30px', fontWeight: 'bold', zIndex: 100,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)',
-          fontSize: '1.1rem', pointerEvents: 'none', animation: 'freeze-shiver 0.3s ease-out'
+          position: 'fixed', top: '30px', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(21, 28, 38, 0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          color: 'var(--text-white)',
+          padding: '16px 28px', 
+          borderRadius: '12px', 
+          fontWeight: '600', 
+          zIndex: 1000,
+          boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.6)',
+          border: `2px solid ${
+            spellAlert.color === 'w' 
+              ? 'var(--primary-neon)' 
+              : (spellAlert.color === 'error' 
+                ? 'var(--accent-pink)' 
+                : 'var(--changer-purple)')
+          }`,
+          borderLeftWidth: '8px',
+          fontFamily: 'var(--font-title)',
+          fontSize: '1.05rem', 
+          pointerEvents: 'none', 
+          animation: 'freeze-shiver 0.3s ease-out',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
         }}>
-          ✨ {spellAlert.message}
+          <span style={{ 
+            fontSize: '1.3rem', 
+            color: spellAlert.color === 'w' 
+              ? 'var(--primary-neon)' 
+              : (spellAlert.color === 'error' 
+                ? 'var(--accent-pink)' 
+                : 'var(--changer-purple)')
+          }}>
+            {spellAlert.color === 'error' ? '⚠️' : '✨'}
+          </span> 
+          <span>{spellAlert.message}</span>
         </div>
       )}
 
       {/* Top controls and game header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <button className="btn-secondary" onClick={handleLeaveGame} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <ArrowLeft size={16} /> Exit Game
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn-secondary" onClick={handleLeaveGame} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ArrowLeft size={16} /> Exit Game
+          </button>
+          {gameState.status === 'active' && !opponentDisconnected && (
+            <button
+              className="btn-secondary"
+              onClick={handleOfferDraw}
+              disabled={drawOfferedByMe}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', borderColor: 'rgba(255,255,255,0.1)' }}
+            >
+               {drawOfferedByMe ? 'Draw Offered' : 'Offer Draw'}
+            </button>
+          )}
+        </div>
 
         <div style={{ textAlign: 'center' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ROOM CODE: </span>
@@ -624,8 +693,10 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
                 gameState.winner === playerColor ? '⏰ Timeout! You won on time! ⏰' : '⏰ Timeout! You ran out of time. ⏰'
               ) : gameState.status === 'checkmate' ? (
                 gameState.winner === playerColor ? '🎉 Checkmate! You are victorious! 🎉' : '💀 Checkmate! You have been defeated. 💀'
+              ) : gameState.status === 'draw-agreement' ? (
+                ' Match ended in a Draw by Agreement. '
               ) : (
-                '🤝 Match ended in a Stalemate. 🤝'
+                ' Match ended in a Stalemate. '
               )}
             </p>
 
@@ -685,6 +756,28 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
             <button className="btn-secondary" onClick={() => setPromotionPending(null)} style={{ marginTop: '0.5rem' }}>
               Cancel Move
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Draw Offer Modal Dialog */}
+      {drawOfferReceived && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="glass-panel" style={{ padding: '2.5rem', maxWidth: '400px', width: '90%', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '2px solid var(--primary-neon)' }}>
+            <h2 className="title-gradient" style={{ fontSize: '1.8rem' }}>Draw Offered</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Your opponent has offered a Draw. Would you like to accept it?</p>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', width: '100%', marginTop: '1rem' }}>
+              <button className="btn-primary" onClick={() => handleRespondDraw(true)} style={{ flex: 1 }}>
+                Accept Draw
+              </button>
+              <button className="btn-secondary" onClick={() => handleRespondDraw(false)} style={{ flex: 1 }}>
+                Decline Draw
+              </button>
+            </div>
           </div>
         </div>
       )}

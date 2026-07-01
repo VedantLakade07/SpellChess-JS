@@ -349,6 +349,33 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Event: Offer Draw
+  socket.on('offer-draw', ({ roomId }) => {
+    socket.to(roomId).emit('draw-offered');
+  });
+
+  // Event: Respond to Draw
+  socket.on('respond-draw', ({ roomId, accept }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    if (accept) {
+      room.gameState.status = 'draw-agreement';
+      if (room.timeoutId) {
+        clearTimeout(room.timeoutId);
+        room.timeoutId = null;
+      }
+      saveMatchToDb(roomId, room).catch(err => console.error(err));
+      io.to(roomId).emit('state-updated', room.gameState);
+      io.to(roomId).emit('game-over', {
+        winner: null,
+        status: 'draw-agreement'
+      });
+    } else {
+      socket.to(roomId).emit('draw-declined');
+    }
+  });
+
   // Event: Cast spell
   socket.on('cast-spell', ({ roomId, spellId, targetPos }) => {
     const room = rooms.get(roomId);
