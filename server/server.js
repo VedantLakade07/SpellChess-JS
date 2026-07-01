@@ -312,6 +312,8 @@ io.on('connection', (socket) => {
     }
 
     const fromPiece = room.gameState.board[from.r][from.c];
+    const targetPiece = room.gameState.board[to.r][to.c];
+    const isCapture = targetPiece !== null && targetPiece !== undefined;
 
     const success = chessLogic.makeMove(room.gameState, from, to, promotion);
 
@@ -327,6 +329,7 @@ io.on('connection', (socket) => {
       fromPiece: fromPiece ? { type: fromPiece.type } : null,
       from,
       to,
+      captured: isCapture,
       timestamp: new Date()
     });
 

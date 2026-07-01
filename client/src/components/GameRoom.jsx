@@ -9,6 +9,7 @@ import PromotionModal from './PromotionModal';
 import DrawOfferModal from './DrawOfferModal';
 import ConcludedModal from './ConcludedModal';
 import SpellBook from './SpellBook';
+import { playMoveSound, playCaptureSound, playSpellSound, playGameOverSound } from '../utils/audio';
 
 const GameRoom = ({ roomId, playerColor, onLeave }) => {
   const [gameState, setGameState] = useState(null);
@@ -26,10 +27,12 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   const [drawOfferedByMe, setDrawOfferedByMe] = useState(false);
   const [drawOfferReceived, setDrawOfferReceived] = useState(false);
 
-  const chatEndRef = useRef(null);
-  const battleLogContainerRef = useRef(null);
   const [promotionPending, setPromotionPending] = useState(null);
   const [clocks, setClocks] = useState({ w: 600, b: 600 });
+
+  const isFirstLoadRef = useRef(true);
+  const prevHistoryLengthRef = useRef(0);
+  const prevStatusRef = useRef('active');
 
   useEffect(() => {
     if (gameState && gameState.clocks) {
@@ -55,6 +58,44 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
     return () => clearInterval(interval);
   }, [gameState?.turn, gameState?.status, opponentDisconnected, opponentLeftLobby]);
 
+  // Audio chimes synchronizer hook
+  useEffect(() => {
+    if (!gameState) return;
+
+    if (isFirstLoadRef.current) {
+      isFirstLoadRef.current = false;
+      prevHistoryLengthRef.current = gameState.history ? gameState.history.length : 0;
+      prevStatusRef.current = gameState.status;
+      return;
+    }
+
+    // Play Game Over chords on state transition
+    if (gameState.status !== 'active' && prevStatusRef.current === 'active') {
+      if (gameState.status === 'checkmate' || gameState.status === 'timeout') {
+        const outcome = gameState.winner === playerColor ? 'win' : 'lose';
+        playGameOverSound(outcome);
+      } else if (gameState.status === 'draw' || gameState.status === 'draw-agreement' || gameState.status === 'stalemate') {
+        playGameOverSound('draw');
+      }
+    }
+    prevStatusRef.current = gameState.status;
+
+    // Play Move, Capture, or Spell sounds when history grows
+    if (gameState.history && gameState.history.length > prevHistoryLengthRef.current) {
+      const lastAction = gameState.history[gameState.history.length - 1];
+      if (lastAction.type === 'spell') {
+        playSpellSound(lastAction.spellId);
+      } else if (lastAction.type === 'move') {
+        if (lastAction.captured) {
+          playCaptureSound();
+        } else {
+          playMoveSound();
+        }
+      }
+    }
+    prevHistoryLengthRef.current = gameState.history ? gameState.history.length : 0;
+  }, [gameState, playerColor]);
+
   const formatTime = (timeInSeconds) => {
     const mins = Math.floor(timeInSeconds / 60);
     const secs = timeInSeconds % 60;
@@ -66,18 +107,6 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
     const rank = 8 - r;
     return `${files[c]}${rank}`;
   };
-
-  useEffect(() => {
-    // Scroll chat to bottom on new messages
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
-
-  useEffect(() => {
-    // Scroll battle log container only (preventing page viewport scroll jumps)
-    if (battleLogContainerRef.current) {
-      battleLogContainerRef.current.scrollTop = battleLogContainerRef.current.scrollHeight;
-    }
-  }, [gameState?.history]);
 
   useEffect(() => {
     // Request current room state on mount to prevent lobby race conditions
