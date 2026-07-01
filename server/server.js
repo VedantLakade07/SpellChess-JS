@@ -290,7 +290,7 @@ io.on('connection', (socket) => {
   });
 
   // Event: Make a move
-  socket.on('make-move', ({ roomId, from, to }) => {
+  socket.on('make-move', ({ roomId, from, to, promotion }) => {
     const room = rooms.get(roomId);
     if (!room) return socket.emit('error-msg', { message: 'Room not found.' });
 
@@ -311,7 +311,9 @@ io.on('connection', (socket) => {
       room.gameState.clocks = { ...room.clocks };
     }
 
-    const success = chessLogic.makeMove(room.gameState, from, to);
+    const fromPiece = room.gameState.board[from.r][from.c];
+
+    const success = chessLogic.makeMove(room.gameState, from, to, promotion);
 
     if (!success) {
       return socket.emit('error-msg', { message: 'Invalid chess move.' });
@@ -322,6 +324,7 @@ io.on('connection', (socket) => {
     room.gameState.history.push({
       type: 'move',
       player: playerColor,
+      fromPiece: fromPiece ? { type: fromPiece.type } : null,
       from,
       to,
       timestamp: new Date()

@@ -337,19 +337,13 @@ const hasAnyLegalMoves = (state, color) => {
 };
 
 // Apply a standard or castle move to state
-const makeMove = (state, from, to) => {
+const makeMove = (state, from, to, promotion = 'q') => {
   const piece = state.board[from.r][from.c];
   if (!piece || piece.color !== state.turn) return false;
 
   const legalMoves = getLegalMoves(state, from.r, from.c);
-  const matchedMove = legalMoves.find(m => m.r === to.r && m.c === to.c);
-
-  if (!matchedMove) return false; // Invalid move
-
-  // Check if Move Changer is active and piece moved was Bishop or Queen, consume spell
-  if (state.activeSpells[state.turn]?.moveChanger && (piece.type === 'b' || piece.type === 'q')) {
-    state.activeSpells[state.turn].moveChanger = false;
-  }
+  const matchedMove = legalMoves.find((m) => m.r === to.r && m.c === to.c);
+  if (!matchedMove) return false;
 
   // Check for King capture (king is dead)
   const destPiece = state.board[to.r][to.c];
@@ -357,7 +351,7 @@ const makeMove = (state, from, to) => {
     state.board[to.r][to.c] = { ...piece, hasMoved: true };
     state.board[from.r][from.c] = null;
     state.winner = state.turn;
-    state.status = 'checkmate';
+    state.status = 'checkmate'; // King dead
     state.lastMove = { from, to, piece };
     return true;
   }
@@ -373,9 +367,9 @@ const makeMove = (state, from, to) => {
     state.board[matchedMove.rookFrom.r][matchedMove.rookFrom.c] = null;
   }
 
-  // Pawn promotion to Queen automatically for simplicity
+  // Pawn promotion
   if (piece.type === 'p' && (to.r === 0 || to.r === 7)) {
-    state.board[to.r][to.c].type = 'q';
+    state.board[to.r][to.c].type = promotion || 'q';
   }
 
   state.lastMove = { from, to, piece };

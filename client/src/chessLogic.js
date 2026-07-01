@@ -323,7 +323,7 @@ export const hasAnyLegalMoves = (state, color) => {
   return false;
 };
 
-export const makeMove = (state, from, to) => {
+export const makeMove = (state, from, to, promotion = 'q') => {
   const piece = state.board[from.r][from.c];
   if (!piece || piece.color !== state.turn) return false;
 
@@ -357,7 +357,7 @@ export const makeMove = (state, from, to) => {
   }
 
   if (piece.type === 'p' && (to.r === 0 || to.r === 7)) {
-    state.board[to.r][to.c].type = 'q';
+    state.board[to.r][to.c].type = promotion || 'q';
   }
 
   state.lastMove = { from, to, piece };

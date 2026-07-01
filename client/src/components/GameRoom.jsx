@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { socket } from '../socket';
 import { getLegalMoves } from '../chessLogic';
 import PieceSVG from './ChessPieces';
-import { Copy, Check, MessageSquare, Send, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Copy, Check, MessageSquare, Send, ArrowLeft, RefreshCw, Activity } from 'lucide-react';
 
 const GameRoom = ({ roomId, playerColor, onLeave }) => {
   const [gameState, setGameState] = useState(null);
@@ -19,6 +19,8 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   const [opponentLeftLobby, setOpponentLeftLobby] = useState(false);
 
   const chatEndRef = useRef(null);
+  const battleLogContainerRef = useRef(null);
+  const [promotionPending, setPromotionPending] = useState(null);
   const [clocks, setClocks] = useState({ w: 600, b: 600 });
 
   useEffect(() => {
@@ -51,10 +53,23 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getChessNotation = (r, c) => {
+    const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const rank = 8 - r;
+    return `${files[c]}${rank}`;
+  };
+
   useEffect(() => {
     // Scroll chat to bottom on new messages
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
+
+  useEffect(() => {
+    // Scroll battle log container only (preventing page viewport scroll jumps)
+    if (battleLogContainerRef.current) {
+      battleLogContainerRef.current.scrollTop = battleLogContainerRef.current.scrollHeight;
+    }
+  }, [gameState?.history]);
 
   useEffect(() => {
     // Request current room state on mount to prevent lobby race conditions
@@ -161,7 +176,13 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
     // Make move if clicking a valid move square
     const isMoveValid = validMoves.some((m) => m.r === r && m.c === c);
     if (selectedSquare && isMoveValid) {
-      socket.emit('make-move', { roomId, from: selectedSquare, to: { r, c } });
+      const movingPiece = gameState.board[selectedSquare.r][selectedSquare.c];
+      const isPawnPromotion = movingPiece && movingPiece.type === 'p' && (r === 0 || r === 7);
+      if (isPawnPromotion) {
+        setPromotionPending({ from: selectedSquare, to: { r, c } });
+      } else {
+        socket.emit('make-move', { roomId, from: selectedSquare, to: { r, c } });
+      }
       setSelectedSquare(null);
       setValidMoves([]);
     } else {
@@ -206,7 +227,13 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
       const isMoveValid = validMoves.some((m) => m.r === r && m.c === c);
       
       if (dragData && isMoveValid) {
-        socket.emit('make-move', { roomId, from: dragData, to: { r, c } });
+        const movingPiece = gameState.board[dragData.r][dragData.c];
+        const isPawnPromotion = movingPiece && movingPiece.type === 'p' && (r === 0 || r === 7);
+        if (isPawnPromotion) {
+          setPromotionPending({ from: dragData, to: { r, c } });
+        } else {
+          socket.emit('make-move', { roomId, from: dragData, to: { r, c } });
+        }
       }
     } catch (err) {
       console.error('Drop error:', err);
@@ -224,6 +251,17 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
   const handleCastSelfSpell = (spellId) => {
     if (!gameState || gameState.status !== 'active' || gameState.turn !== playerColor) return;
     socket.emit('cast-spell', { roomId, spellId });
+  };
+
+  const handleSelectPromotion = (type) => {
+    if (!promotionPending) return;
+    socket.emit('make-move', {
+      roomId,
+      from: promotionPending.from,
+      to: promotionPending.to,
+      promotion: type
+    });
+    setPromotionPending(null);
   };
 
   const handleCastFreezeInitiate = () => {
@@ -494,6 +532,44 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
             </div>
           </div>
 
+          {/* Battle Log Panel */}
+          <div className="glass-panel" style={{ padding: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', minHeight: '160px', maxHeight: '200px' }}>
+            <h3 style={{ color: 'var(--primary-neon)', fontSize: '1.1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Activity size={18} style={{ stroke: 'var(--primary-neon)' }} />
+              Battle Log
+            </h3>
+            
+            <div ref={battleLogContainerRef} style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.95rem', paddingRight: '4px' }}>
+              {(!gameState?.history || gameState.history.length === 0) ? (
+                <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.85rem', textAlign: 'center', margin: 'auto' }}>No moves made yet.</p>
+              ) : (
+                gameState.history.map((hist, index) => {
+                  const playerLabel = hist.player === 'w' ? 'White' : 'Black';
+                  const labelColor = hist.player === 'w' ? '#e2fcfb' : 'var(--primary-neon)';
+                  const pieceSymbols = { p: '♙', r: '♖', n: '♘', b: '♗', q: '♕', k: '♔' };
+
+                  return (
+                    <div key={index} style={{ display: 'flex', gap: '8px', padding: '4px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: '4px', borderLeft: `3px solid ${hist.player === 'w' ? '#66fcf1' : '#45a29e'}` }}>
+                      <span style={{ fontWeight: 'bold', color: labelColor }}>{playerLabel}:</span>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {hist.type === 'move' ? (
+                          <>
+                            {pieceSymbols[hist.fromPiece?.type] || ''} {getChessNotation(hist.from.r, hist.from.c)} → {getChessNotation(hist.to.r, hist.to.c)}
+                          </>
+                        ) : (
+                          <>
+                            {hist.spellId === 'freeze' ? '❄️ casted Freeze' : (hist.spellId === 'double_move' ? '⚡ casted Double Move' : '✨ casted Move Changer')}
+                            {hist.targetPos && ` on ${getChessNotation(hist.targetPos.r, hist.targetPos.c)}`}
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
           {/* Chat Panel */}
           <div className="glass-panel chat-container">
             <div style={{ padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -573,6 +649,42 @@ const GameRoom = ({ roomId, playerColor, onLeave }) => {
             {!opponentDisconnected && !opponentLeftLobby && rematchRequested[playerColor === 'w' ? 'b' : 'w'] && (
               <p style={{ fontSize: '0.85rem', color: 'var(--primary-neon)' }}>Opponent has requested a rematch!</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Pawn Promotion Modal Dialog */}
+      {promotionPending && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="glass-panel" style={{ padding: '2.5rem', maxWidth: '400px', width: '90%', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '1.5rem', border: '2px solid var(--primary-neon)' }}>
+            <h2 className="title-gradient" style={{ fontSize: '1.8rem' }}>Pawn Promotion</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Choose which piece to promote your pawn to:</p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginTop: '0.5rem' }}>
+              {[
+                { type: 'q', label: 'Queen', icon: '♕' },
+                { type: 'r', label: 'Rook', icon: '♖' },
+                { type: 'b', label: 'Bishop', icon: '♗' },
+                { type: 'n', label: 'Knight', icon: '♘' }
+              ].map((opt) => (
+                <button
+                  key={opt.type}
+                  className="btn-secondary"
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '12px 6px', border: '1px solid rgba(255,255,255,0.08)' }}
+                  onClick={() => handleSelectPromotion(opt.type)}
+                >
+                  <span style={{ fontSize: '2.2rem', color: 'var(--primary-neon)', lineHeight: '1' }}>{opt.icon}</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <button className="btn-secondary" onClick={() => setPromotionPending(null)} style={{ marginTop: '0.5rem' }}>
+              Cancel Move
+            </button>
           </div>
         </div>
       )}
